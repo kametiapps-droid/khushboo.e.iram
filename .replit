@@ -1,5 +1,5 @@
 entrypoint = "index.js"
-modules = ["nodejs-22"]
+modules = ["nodejs-20"]
 hidden = [".config", "package-lock.json"]
 
 [gitHubImport]
@@ -10,9 +10,10 @@ channel = "stable-24_11"
 packages = ["unzip"]
 
 [deployment]
-run = ["node", "index.js"]
+run = ["npm", "run", "start"]
 deploymentTarget = "autoscale"
 ignorePorts = false
+build = ["npm", "run", "build"]
 
 [agent]
 expertMode = true
@@ -27,10 +28,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "dev"
+args = "Start application"
 
 [[workflows.workflow]]
-name = "dev"
+name = "Start application"
 author = "agent"
 
 [[workflows.workflow.tasks]]
@@ -44,3 +45,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 33219
+externalPort = 3000
