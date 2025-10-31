@@ -29,6 +29,14 @@ if (process.env.NODE_ENV === 'production') {
     console.error('ERROR: SESSION_SECRET must be set in production environment');
     process.exit(1);
   }
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    console.error('ERROR: ADMIN_EMAIL and ADMIN_PASSWORD must be set in production environment');
+    process.exit(1);
+  }
+  if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length < 8) {
+    console.error('ERROR: ADMIN_PASSWORD must be at least 8 characters long');
+    process.exit(1);
+  }
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'khushboo-iram-jwt-secret-change-in-production';
@@ -83,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', generalLimiter);
   
   // Authentication routes
-  app.post("/api/auth/signup", authLimiter, async (req, res) => {
+  app.post("/api/auth/signup", doubleCsrfProtection, authLimiter, async (req, res) => {
     try {
       const validated = signupSchema.parse(req.body);
       
@@ -121,7 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", authLimiter, async (req, res) => {
+  app.post("/api/auth/login", doubleCsrfProtection, authLimiter, async (req, res) => {
     try {
       const validated = loginSchema.parse(req.body);
       
@@ -178,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", async (req, res) => {
+  app.post("/api/auth/logout", doubleCsrfProtection, async (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ error: "Failed to log out" });
@@ -213,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/forgot-password", authLimiter, async (req, res) => {
+  app.post("/api/auth/forgot-password", doubleCsrfProtection, authLimiter, async (req, res) => {
     try {
       const validated = forgotPasswordSchema.parse(req.body);
       
@@ -249,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
+  app.post("/api/auth/reset-password", doubleCsrfProtection, authLimiter, async (req, res) => {
     try {
       const validated = resetPasswordSchema.parse(req.body);
       
@@ -447,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cart", async (req, res) => {
+  app.post("/api/cart", doubleCsrfProtection, async (req, res) => {
     try {
       const validated = insertCartItemSchema.parse({
         ...req.body,
@@ -462,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/cart/:id", async (req, res) => {
+  app.patch("/api/cart/:id", doubleCsrfProtection, async (req, res) => {
     try {
       const { quantity } = req.body;
       if (quantity <= 0) {
@@ -477,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cart/:id", async (req, res) => {
+  app.delete("/api/cart/:id", doubleCsrfProtection, async (req, res) => {
     try {
       await storage.removeFromCart(req.params.id);
       res.json({ success: true });
@@ -487,7 +495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orders", async (req, res) => {
+  app.post("/api/orders", doubleCsrfProtection, async (req, res) => {
     try {
       const sessionId = req.session.id;
       let cartItems;
@@ -670,7 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contact", generalLimiter, async (req, res) => {
+  app.post("/api/contact", doubleCsrfProtection, generalLimiter, async (req, res) => {
     try {
       const { name, email, subject, message } = req.body;
       

@@ -67,7 +67,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false }));
 
 const {
-  generateToken,
+  generateToken: csrfGenerateToken,
   doubleCsrfProtection,
 } = doubleCsrf({
   getSecret: () => process.env.SESSION_SECRET || 'khushboo-iram-secret-key-change-in-production',
@@ -80,10 +80,13 @@ const {
   },
   size: 64,
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+  getSessionIdentifier: (req) => {
+    return req.session?.userId || '';
+  },
 });
 
 app.get("/api/csrf-token", (req, res) => {
-  const token = generateToken(req, res);
+  const token = csrfGenerateToken(req, res, false);
   res.json({ token });
 });
 

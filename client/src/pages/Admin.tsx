@@ -249,10 +249,7 @@ function AdminDashboard() {
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
-      return await apiRequest(`/api/admin/orders/${orderId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
+      return await apiRequest("PATCH", `/api/admin/orders/${orderId}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
@@ -274,13 +271,7 @@ function AdminDashboard() {
 
   const createProductMutation = useMutation({
     mutationFn: async (productData: any) => {
-      const response = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productData),
-      });
-      if (!response.ok) throw new Error("Failed to create product");
-      return response.json();
+      return await apiRequest("POST", "/api/products", productData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -310,11 +301,7 @@ function AdminDashboard() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: string) => {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete product");
-      return response.json();
+      return await apiRequest("DELETE", `/api/products/${productId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });

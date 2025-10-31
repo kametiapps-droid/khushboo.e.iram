@@ -74,15 +74,7 @@ export default function Auth() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Login failed");
-      }
+      const response = await apiRequest("POST", "/api/auth/login", data);
       return response.json();
     },
     onSuccess: () => {
@@ -96,15 +88,7 @@ export default function Auth() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: { email: string; username: string; password: string }) => {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Signup failed");
-      }
+      const response = await apiRequest("POST", "/api/auth/signup", data);
       return response.json();
     },
     onSuccess: () => {
@@ -118,14 +102,7 @@ export default function Auth() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to send reset email");
-      }
+      const response = await apiRequest("POST", "/api/auth/forgot-password", { email });
       return response.json();
     },
     onSuccess: (data) => {
