@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MobileMenu } from "@/components/MobileMenu";
@@ -7,10 +9,34 @@ import { CartDrawer } from "@/components/CartDrawer";
 import { ProductCard } from "@/components/ProductCard";
 import { Badge } from "@/components/ui/badge";
 
-import perfume1 from "@assets/generated_images/Product_card_perfume_1_d7380d71.png";
-import perfume2 from "@assets/generated_images/Product_card_perfume_2_7581cb26.png";
-import attar from "@assets/generated_images/Product_card_attar_bottle_2b233b12.png";
-import productSample from "@assets/generated_images/Product_sample_perfume_bottle_5df1c02b.png";
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  description: string;
+  price: string;
+  image: string;
+  categoryId: string | null;
+  rating: number;
+  stock: number;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  productCount: number;
+}
+
+interface CartItemWithProduct {
+  id: string;
+  sessionId: string | null;
+  userId: string | null;
+  productId: string;
+  quantity: number;
+  product: Product;
+}
 
 interface CartItem {
   id: string;
@@ -21,90 +47,89 @@ interface CartItem {
   image: string;
 }
 
-const categoryData: Record<string, { title: string; description: string; products: any[] }> = {
-  perfumes: {
-    title: "Luxury Perfumes",
-    description: "Discover our exquisite collection of luxury perfumes from world-renowned brands",
-    products: [
-      { id: "p1", name: "Elegant Rose Essence", brand: "Luxury Fragrances", price: 8999, image: perfume1, rating: 5 },
-      { id: "p2", name: "Midnight Oud", brand: "Premium Collection", price: 12000, image: perfume2, rating: 5 },
-      { id: "p3", name: "Ocean Breeze", brand: "Fresh Collection", price: 6500, image: productSample, rating: 4 },
-      { id: "p4", name: "Royal Romance", brand: "Luxury Fragrances", price: 9500, image: perfume1, rating: 5 },
-    ],
-  },
-  attar: {
-    title: "Premium Attar",
-    description: "Traditional Arabian fragrances crafted with the finest ingredients",
-    products: [
-      { id: "a1", name: "Royal Attar Gold", brand: "Traditional Scents", price: 7550, image: attar, rating: 5 },
-      { id: "a2", name: "Amber Mystique", brand: "Heritage Collection", price: 8200, image: attar, rating: 5 },
-      { id: "a3", name: "Saffron Delight", brand: "Traditional Scents", price: 9000, image: attar, rating: 5 },
-      { id: "a4", name: "Musk Al Haramain", brand: "Premium Attar", price: 10500, image: attar, rating: 5 },
-    ],
-  },
-  "body-spray": {
-    title: "Body Sprays",
-    description: "Fresh and long-lasting body mists for everyday elegance",
-    products: [
-      { id: "b1", name: "Fresh Morning Mist", brand: "Daily Collection", price: 2500, image: productSample, rating: 4 },
-      { id: "b2", name: "Citrus Burst", brand: "Active Life", price: 2200, image: productSample, rating: 4 },
-      { id: "b3", name: "Lavender Dreams", brand: "Calm & Fresh", price: 2800, image: productSample, rating: 5 },
-      { id: "b4", name: "Sport Energy", brand: "Active Life", price: 2400, image: productSample, rating: 4 },
-    ],
-  },
-};
-
 export default function CategoryDetail() {
   const [, params] = useRoute("/categories/:slug");
-  const slug = params?.slug || "";
+  const categoryId = params?.slug || "";
   
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
-  const category = categoryData[slug];
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  const { data: cartData = [] } = useQuery<CartItemWithProduct[]>({
+    queryKey: ['/api/cart'],
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: async ({ productId, productName }: { productId: string; productName: string }) => {
+      return apiRequest('POST', '/api/cart', { productId, quantity: 1 });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      setAddingProductId(null);
+      setAddedProductId(variables.productId);
+      setTimeout(() => setAddedProductId(null), 2000);
+      setCartOpen(true);
+    },
+  });
+
+  const updateCartMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      return apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const removeFromCartMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const category = categories.find(c => c.id === categoryId);
+  const products = allProducts.filter(p => p.categoryId === categoryId);
 
   const handleAddToCart = (productId: string) => {
-    const product = category?.products.find((p) => p.id === productId);
-    if (!product) return;
-
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.id === productId);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
-          brand: product.brand,
-          price: product.price,
-          quantity: 1,
-          image: product.image,
-        },
-      ];
-    });
-    setCartOpen(true);
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setAddingProductId(productId);
+      addToCartMutation.mutate({ productId, productName: product.name });
+    }
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+      removeFromCartMutation.mutate(id);
     } else {
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      );
+      updateCartMutation.mutate({ id, quantity });
     }
   };
 
   const handleRemove = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    removeFromCartMutation.mutate(id);
   };
+
+  const cartItems: CartItem[] = cartData.map(item => ({
+    id: item.id,
+    name: item.product.name,
+    brand: item.product.brand,
+    price: parseFloat(item.product.price),
+    quantity: item.quantity,
+    image: item.product.image,
+  }));
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -143,23 +168,30 @@ export default function CategoryDetail() {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8 sm:mb-10 md:mb-12">
               <Badge variant="secondary" className="mb-3 sm:mb-4">
-                {category.products.length} Products
+                {products.length} Products
               </Badge>
               <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-light mb-4">
-                {category.title}
+                {category.name}
               </h1>
               <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
                 {category.description}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
-              {category.products.map((product) => (
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+              {products.map((product) => (
                 <ProductCard
                   key={product.id}
-                  {...product}
+                  id={product.id}
+                  name={product.name}
+                  brand={product.brand}
+                  price={parseFloat(product.price)}
+                  image={product.image}
+                  rating={product.rating}
                   onAddToCart={handleAddToCart}
                   onClick={(id) => console.log("Product clicked:", id)}
+                  isAdding={addingProductId === product.id}
+                  isAdded={addedProductId === product.id}
                 />
               ))}
             </div>

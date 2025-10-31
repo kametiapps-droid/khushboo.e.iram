@@ -101,14 +101,6 @@ export function Header({ cartItemCount = 0, onCartClick, onMenuClick }: HeaderPr
             </Button>
             <Button 
               variant="ghost" 
-              data-testid="nav-categories" 
-              asChild
-              className={isActive("/categories") ? "bg-accent" : ""}
-            >
-              <Link href="/categories">Categories</Link>
-            </Button>
-            <Button 
-              variant="ghost" 
               data-testid="nav-contact" 
               asChild
               className={isActive("/contact") ? "bg-accent" : ""}
