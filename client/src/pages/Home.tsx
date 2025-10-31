@@ -8,9 +8,9 @@ import { CategoryCard } from "@/components/CategoryCard";
 import { CartDrawer } from "@/components/CartDrawer";
 import { MobileMenu } from "@/components/MobileMenu";
 import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Truck, CreditCard, Award } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
@@ -48,12 +48,14 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [addedProductId, setAddedProductId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const productsPerPage = 20;
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories"],
   });
 
@@ -92,7 +94,10 @@ export default function Home() {
     },
   });
 
-  const featuredProducts = products.slice(0, 8);
+  const totalPages = Math.ceil(products.length / productsPerPage);
+  const startIndex = (currentPage - 1) * productsPerPage;
+  const endIndex = startIndex + productsPerPage;
+  const currentProducts = products.slice(startIndex, endIndex);
 
   const handleAddToCart = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -139,11 +144,8 @@ export default function Home() {
         {/* Products Section */}
         <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light mb-8 sm:mb-12 text-center" data-testid="text-products-title">
-              Our Products
-            </h2>
             <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-8 lg:gap-10">
-              {featuredProducts.map((product: any) => (
+              {currentProducts.map((product: any) => (
                 <ProductCard
                   key={product.id}
                   id={product.id}
@@ -151,11 +153,72 @@ export default function Home() {
                   brand={product.brand}
                   price={parseFloat(product.price)}
                   image={product.image}
-                  rating={product.rating}
                   onAddToCart={handleAddToCart}
                   onClick={() => setLocation("/shop")}
                   isAdding={addingProductId === product.id}
                   isAdded={addedProductId === product.id}
+                  hideRating={true}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-12">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      data-testid={`button-page-${page}`}
+                      className="min-w-10"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Categories Section */}
+        <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-muted/30">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light mb-8 sm:mb-12 text-center" data-testid="text-categories-title">
+              Shop by Category
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {categories.map((category: any) => (
+                <CategoryCard
+                  key={category.id}
+                  name={category.name}
+                  description={category.description}
+                  image={category.image}
+                  productCount={category.productCount}
+                  onClick={() => setLocation(`/categories/${category.id}`)}
                 />
               ))}
             </div>

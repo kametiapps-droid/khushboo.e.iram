@@ -13,6 +13,7 @@ interface ProductCardProps {
   onClick?: (id: string) => void;
   isAdding?: boolean;
   isAdded?: boolean;
+  hideRating?: boolean;
 }
 
 export function ProductCard({
@@ -26,6 +27,7 @@ export function ProductCard({
   onClick,
   isAdding = false,
   isAdded = false,
+  hideRating = false,
 }: ProductCardProps) {
   return (
     <Card
@@ -51,18 +53,20 @@ export function ProductCard({
             {name}
           </h3>
 
-          <div className="flex items-center gap-0.5 sm:gap-1" data-testid={`rating-${id}`}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star
-                key={i}
-                className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                  i < rating
-                    ? "fill-primary text-primary"
-                    : "fill-muted text-muted"
-                }`}
-              />
-            ))}
-          </div>
+          {!hideRating && (
+            <div className="flex items-center gap-0.5 sm:gap-1" data-testid={`rating-${id}`}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                    i < rating
+                      ? "fill-primary text-primary"
+                      : "fill-muted text-muted"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-1 sm:pt-2 flex-wrap gap-2">
             <p className="text-lg sm:text-xl md:text-2xl font-semibold" data-testid={`text-price-${id}`}>
