@@ -158,101 +158,50 @@ export default function Shop() {
         </div>
 
         <div className="container mx-auto px-6 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <aside className="lg:col-span-1">
-              <div className="bg-muted/30 p-6 rounded-lg space-y-6">
-                <div>
-                  <Label className="text-base font-semibold mb-4 block">Category</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger data-testid="select-category">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Products</SelectItem>
-                      <SelectItem value="cat-1">Luxury Perfumes</SelectItem>
-                      <SelectItem value="cat-2">Traditional Attar</SelectItem>
-                      <SelectItem value="cat-3">Body Sprays</SelectItem>
-                      <SelectItem value="cat-4">Unisex Fragrances</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-base font-semibold mb-4 block">
-                    Price Range (PKR {priceRange[0]} - PKR {priceRange[1]})
-                  </Label>
-                  <Slider
-                    min={0}
-                    max={15000}
-                    step={500}
-                    value={priceRange}
-                    onValueChange={setPriceRange}
-                    className="mt-4"
-                  />
-                </div>
-
-                <Button onClick={() => {
-                  setSelectedCategory("all");
-                  setPriceRange([0, 15000]);
-                }} variant="outline" className="w-full">
-                  Clear Filters
-                </Button>
-              </div>
-            </aside>
-
-            <div className="lg:col-span-3">
-              <div className="flex justify-between items-center mb-6">
-                <p className="text-muted-foreground">
-                  Showing {filteredProducts.length} products
-                </p>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="featured">Featured</SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
-                    <SelectItem value="name">Name: A to Z</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {productsLoading ? (
-                  <p className="text-center py-12 col-span-3" data-testid="text-loading">Loading products...</p>
-                ) : (
-                  filteredProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      id={product.id}
-                      name={product.name}
-                      brand={product.brand}
-                      price={parseFloat(product.price)}
-                      image={product.image}
-                      rating={product.rating}
-                      onAddToCart={handleAddToCart}
-                      onClick={(id) => console.log("Product clicked:", id)}
-                      isAdding={addingProductId === product.id}
-                      isAdded={addedProductId === product.id}
-                    />
-                  ))
-                )}
-              </div>
-
-              {filteredProducts.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-lg">No products found matching your filters</p>
-                  <Button onClick={() => {
-                    setSelectedCategory("all");
-                    setPriceRange([0, 15000]);
-                  }} className="mt-4">
-                    Clear Filters
-                  </Button>
-                </div>
-              )}
-            </div>
+          <div className="flex justify-between items-center mb-6">
+            <p className="text-muted-foreground">
+              Showing {filteredProducts.length} products
+            </p>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="featured">Featured</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="name">Name: A to Z</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {productsLoading ? (
+              <p className="text-center py-12 col-span-2" data-testid="text-loading">Loading products...</p>
+            ) : (
+              filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  name={product.name}
+                  brand={product.brand}
+                  price={parseFloat(product.price)}
+                  image={product.image}
+                  rating={product.rating}
+                  onAddToCart={handleAddToCart}
+                  onClick={(id) => console.log("Product clicked:", id)}
+                  isAdding={addingProductId === product.id}
+                  isAdded={addedProductId === product.id}
+                />
+              ))
+            )}
+          </div>
+
+          {filteredProducts.length === 0 && !productsLoading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No products found</p>
+            </div>
+          )}
         </div>
       </main>
 
