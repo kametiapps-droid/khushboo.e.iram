@@ -59,15 +59,15 @@ export default function Shop() {
   });
 
   const addToCartMutation = useMutation({
-    mutationFn: async (productId: string) => {
+    mutationFn: async ({ productId, productName }: { productId: string; productName: string }) => {
       return apiRequest('POST', '/api/cart', { productId, quantity: 1 });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
       setCartOpen(true);
       toast({
-        title: "Added to cart",
-        description: "Product has been added to your cart",
+        title: `You added ${variables.productName} to your shopping cart.`,
+        variant: "success",
       });
     },
     onError: () => {
@@ -98,7 +98,10 @@ export default function Shop() {
   });
 
   const handleAddToCart = (productId: string) => {
-    addToCartMutation.mutate(productId);
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      addToCartMutation.mutate({ productId, productName: product.name });
+    }
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
