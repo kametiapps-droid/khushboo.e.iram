@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -21,6 +22,27 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  description: string;
+  price: string;
+  image: string;
+  categoryId: string | null;
+  rating: number;
+  stock: number;
+}
+
+interface CartItemWithProduct {
+  id: string;
+  sessionId: string | null;
+  userId: string | null;
+  productId: string;
+  quantity: number;
+  product: Product;
+}
+
 interface CartItem {
   id: string;
   name: string;
@@ -33,7 +55,6 @@ interface CartItem {
 export default function Auth() {
   const [, navigate] = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -117,6 +138,39 @@ export default function Auth() {
     },
   });
 
+  const { data: cartData = [] } = useQuery<CartItemWithProduct[]>({
+    queryKey: ['/api/cart'],
+  });
+
+  const updateCartMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      return apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const removeFromCartMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const cartItems: CartItem[] = cartData.map(item => ({
+    id: item.id,
+    name: item.product.name,
+    brand: item.product.brand,
+    price: parseFloat(item.product.price),
+    quantity: item.quantity,
+    image: item.product.image,
+  }));
+
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
   const handleGoogleLogin = async () => {
     try {
       const response = await fetch("/api/auth/google");
@@ -167,19 +221,15 @@ export default function Auth() {
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+      removeFromCartMutation.mutate(id);
     } else {
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      );
+      updateCartMutation.mutate({ id, quantity });
     }
   };
 
   const handleRemove = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    removeFromCartMutation.mutate(id);
   };
-
-  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="min-h-screen flex flex-col">
