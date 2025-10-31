@@ -48,7 +48,8 @@ export default function Shop() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [priceRange, setPriceRange] = useState([0, 15000]);
   const [sortBy, setSortBy] = useState("featured");
-  const { toast } = useToast();
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ['/api/products'],
@@ -64,18 +65,10 @@ export default function Shop() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      setAddingProductId(null);
+      setAddedProductId(variables.productId);
+      setTimeout(() => setAddedProductId(null), 2000);
       setCartOpen(true);
-      toast({
-        title: `You added ${variables.productName} to your shopping cart.`,
-        variant: "success",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add product to cart",
-        variant: "destructive",
-      });
     },
   });
 
@@ -100,6 +93,7 @@ export default function Shop() {
   const handleAddToCart = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
+      setAddingProductId(productId);
       addToCartMutation.mutate({ productId, productName: product.name });
     }
   };
@@ -239,6 +233,8 @@ export default function Shop() {
                       rating={product.rating}
                       onAddToCart={handleAddToCart}
                       onClick={(id) => console.log("Product clicked:", id)}
+                      isAdding={addingProductId === product.id}
+                      isAdded={addedProductId === product.id}
                     />
                   ))
                 )}

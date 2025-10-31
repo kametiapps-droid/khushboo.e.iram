@@ -46,7 +46,8 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { toast } = useToast();
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -66,11 +67,10 @@ export default function Home() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      setAddingProductId(null);
+      setAddedProductId(variables.productId);
+      setTimeout(() => setAddedProductId(null), 2000);
       setCartOpen(true);
-      toast({
-        title: `You added ${variables.productName} to your shopping cart.`,
-        variant: "success",
-      });
     },
   });
 
@@ -97,6 +97,7 @@ export default function Home() {
   const handleAddToCart = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
+      setAddingProductId(productId);
       addToCartMutation.mutate({ productId, productName: product.name });
     }
   };
@@ -153,6 +154,8 @@ export default function Home() {
                   rating={product.rating}
                   onAddToCart={handleAddToCart}
                   onClick={() => setLocation("/shop")}
+                  isAdding={addingProductId === product.id}
+                  isAdded={addedProductId === product.id}
                 />
               ))}
             </div>

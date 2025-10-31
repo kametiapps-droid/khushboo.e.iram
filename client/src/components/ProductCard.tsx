@@ -1,4 +1,4 @@
-import { Star, ShoppingCart } from "lucide-react";
+import { Star, ShoppingCart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -11,6 +11,8 @@ interface ProductCardProps {
   rating?: number;
   onAddToCart?: (id: string) => void;
   onClick?: (id: string) => void;
+  isAdding?: boolean;
+  isAdded?: boolean;
 }
 
 export function ProductCard({
@@ -22,6 +24,8 @@ export function ProductCard({
   rating = 5,
   onAddToCart,
   onClick,
+  isAdding = false,
+  isAdded = false,
 }: ProductCardProps) {
   return (
     <Card
@@ -72,9 +76,24 @@ export function ProductCard({
               }}
               data-testid={`button-add-to-cart-${id}`}
               className="text-xs sm:text-sm"
+              disabled={isAdding}
             >
-              <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Add
+              {isAdding ? (
+                <>
+                  <span className="animate-spin mr-1 sm:mr-2">⏳</span>
+                  Adding...
+                </>
+              ) : isAdded ? (
+                <>
+                  <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Added
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Add
+                </>
+              )}
             </Button>
           </div>
         </div>
