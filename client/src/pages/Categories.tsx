@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CategoryCard } from "@/components/CategoryCard";
@@ -6,33 +8,34 @@ import { CartDrawer } from "@/components/CartDrawer";
 import { MobileMenu } from "@/components/MobileMenu";
 import { useLocation } from "wouter";
 
-import attarCategory from "@assets/generated_images/Attar_collection_category_image_262b83c4.png";
-import bodySprayCategory from "@assets/generated_images/Body_spray_collection_image_78ba13da.png";
-import scentCategory from "@assets/generated_images/Scent_collection_category_image_863be1ae.png";
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  productCount: number;
+}
 
-const categories = [
-  {
-    name: "Premium Perfumes",
-    description: "Luxury perfumes from world-renowned brands and exclusive collections",
-    image: scentCategory,
-    productCount: 32,
-    slug: "perfume"
-  },
-  {
-    name: "Traditional Attar",
-    description: "Authentic Arabian fragrances crafted with the finest natural ingredients",
-    image: attarCategory,
-    productCount: 24,
-    slug: "attar"
-  },
-  {
-    name: "Body Sprays",
-    description: "Fresh and long-lasting body mists perfect for everyday elegance",
-    image: bodySprayCategory,
-    productCount: 18,
-    slug: "body-spray"
-  },
-];
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  description: string;
+  price: string;
+  image: string;
+  categoryId: string | null;
+  rating: number;
+  stock: number;
+}
+
+interface CartItemWithProduct {
+  id: string;
+  sessionId: string | null;
+  userId: string | null;
+  productId: string;
+  quantity: number;
+  product: Product;
+}
 
 interface CartItem {
   id: string;
@@ -45,23 +48,55 @@ interface CartItem {
 
 export default function Categories() {
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setLocation] = useLocation();
 
+  const { data: categories = [], isLoading } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  const { data: cartData = [] } = useQuery<CartItemWithProduct[]>({
+    queryKey: ['/api/cart'],
+  });
+
+  const updateCartMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      return apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const removeFromCartMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+      removeFromCartMutation.mutate(id);
     } else {
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      );
+      updateCartMutation.mutate({ id, quantity });
     }
   };
 
   const handleRemove = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    removeFromCartMutation.mutate(id);
   };
+
+  const cartItems: CartItem[] = cartData.map(item => ({
+    id: item.id,
+    name: item.product.name,
+    brand: item.product.brand,
+    price: parseFloat(item.product.price),
+    quantity: item.quantity,
+    image: item.product.image,
+  }));
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -87,17 +122,24 @@ export default function Categories() {
           </div>
         </div>
 
-        <section className="py-16 md:py-24">
-          <div className="container mx-auto px-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {categories.map((category) => (
-                <CategoryCard
-                  key={category.name}
-                  {...category}
-                  onClick={() => setLocation("/shop")}
-                />
-              ))}
-            </div>
+        <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-muted/30">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            {isLoading ? (
+              <p className="text-center py-12" data-testid="text-loading">Loading categories...</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
+                {categories.map((category) => (
+                  <CategoryCard
+                    key={category.id}
+                    name={category.name}
+                    description={category.description}
+                    image={category.image}
+                    productCount={category.productCount}
+                    onClick={() => setLocation(`/categories/${category.id}`)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
