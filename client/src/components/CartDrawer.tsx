@@ -41,7 +41,7 @@ export function CartDrawer({
         onClick={onClose}
         data-testid="overlay-cart"
       />
-      <div className="fixed right-0 top-0 h-full w-full md:w-96 bg-background z-50 shadow-xl flex flex-col" data-testid="drawer-cart">
+      <div className="fixed right-0 top-0 h-full w-[85vw] sm:w-96 max-w-md bg-background z-50 shadow-xl flex flex-col" data-testid="drawer-cart">
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="font-serif text-2xl font-medium" data-testid="text-cart-title">
             Shopping Cart
