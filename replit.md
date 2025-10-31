@@ -6,6 +6,21 @@ KHUSHBOO.E.IRAM is a professional luxury perfume e-commerce platform specializin
 
 ## Recent Changes
 
+**October 31, 2025:**
+- **Expanded Category Collection** with 4 new fragrance categories
+  - Gift Sets: Curated fragrance collections for special occasions
+  - Unisex Fragrances: Modern scents breaking traditional boundaries
+  - Incense & Bakhoor: Traditional Arabian home fragrances
+  - Fragrance Oils: Pure concentrated oils for long-lasting scent
+- **Enhanced Product Catalog** now featuring 21 products across 7 categories
+  - All categories fully populated with appropriate products
+  - Professional product descriptions and pricing
+  - Each category has dedicated detail page with products
+- **Database Seeding** successfully completed
+  - 7 total categories in the store
+  - 21 total products across all categories
+  - All category pages tested and verified working
+
 **October 30, 2025:**
 - **Complete Authentication System** with secure password management
   - Email/password signup and login with bcrypt password hashing
