@@ -17,6 +17,17 @@ import {
   resetPasswordSchema
 } from "@shared/schema";
 
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'khushboo-iram-jwt-secret-change-in-production') {
+    console.error('ERROR: JWT_SECRET must be set in production environment');
+    process.exit(1);
+  }
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'khushboo-iram-secret-key-change-in-production') {
+    console.error('ERROR: SESSION_SECRET must be set in production environment');
+    process.exit(1);
+  }
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'khushboo-iram-jwt-secret-change-in-production';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -27,6 +38,24 @@ const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI
 ) : null;
+
+async function requireAuth(req: any, res: any, next: any) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+}
+
+async function requireAdmin(req: any, res: any, next: any) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user || user.isAdmin !== 'true') {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -111,7 +140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id, 
           email: user.email, 
           username: user.username,
-          googleId: user.googleId 
+          googleId: user.googleId,
+          isAdmin: user.isAdmin === 'true'
         }
       });
     } catch (error) {
@@ -268,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", async (req, res) => {
+  app.post("/api/products", requireAdmin, async (req, res) => {
     try {
       const validated = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validated);
@@ -279,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/products/:id", async (req, res) => {
+  app.patch("/api/products/:id", requireAdmin, async (req, res) => {
     try {
       const existingProduct = await storage.getProductById(req.params.id);
       if (!existingProduct) {
@@ -296,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/products/:id", async (req, res) => {
+  app.delete("/api/products/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteProduct(req.params.id);
       res.json({ success: true, message: "Product deleted successfully" });
@@ -385,7 +415,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orders", async (req, res) => {
     try {
       const sessionId = req.session.id;
-      const cartItems = await storage.getCartItems(sessionId);
+      let cartItems;
+      
+      if (req.session.userId) {
+        cartItems = await storage.getCartItemsByUserId(req.session.userId);
+      } else {
+        cartItems = await storage.getCartItems(sessionId);
+      }
       
       if (cartItems.length === 0) {
         return res.status(400).json({ error: "Cart is empty" });
@@ -398,6 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validated = insertOrderSchema.parse({
         ...req.body,
+        userId: req.session.userId || null,
         total: total.toFixed(2),
       });
 
@@ -412,7 +449,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      await storage.clearCart(sessionId);
+      if (req.session.userId) {
+        await storage.clearCartByUserId(req.session.userId);
+      } else {
+        await storage.clearCart(sessionId);
+      }
 
       res.json(order);
     } catch (error) {
@@ -421,12 +462,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orders/:id", async (req, res) => {
+  app.get("/api/orders/:id", requireAuth, async (req, res) => {
     try {
       const order = await storage.getOrderById(req.params.id);
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
+      
+      const user = await storage.getUser(req.session.userId!);
+      if (order.userId !== req.session.userId && user?.isAdmin !== 'true') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
       res.json(order);
     } catch (error) {
       console.error("Error fetching order:", error);
@@ -434,8 +481,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orders/user/:userId", async (req, res) => {
+  app.get("/api/orders/user/:userId", requireAuth, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (req.params.userId !== req.session.userId && user?.isAdmin !== 'true') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
       const orders = await storage.getOrdersByUserId(req.params.userId);
       res.json(orders);
     } catch (error) {

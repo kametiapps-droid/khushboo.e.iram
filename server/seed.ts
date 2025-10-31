@@ -1,5 +1,7 @@
 import { db } from "./db";
-import { categories, products } from "@shared/schema";
+import { categories, products, users } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 async function seed() {
   console.log("Seeding database...");
@@ -7,6 +9,38 @@ async function seed() {
   // Clear existing data
   await db.delete(products);
   await db.delete(categories);
+
+  // Create admin user (only if ADMIN_EMAIL and ADMIN_PASSWORD are set)
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (adminEmail && adminPassword) {
+    if (process.env.NODE_ENV === 'production' && adminPassword === 'Admin123!') {
+      console.error("ERROR: Cannot use default admin password in production");
+      process.exit(1);
+    }
+    
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    
+    const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail));
+    if (existingAdmin.length === 0) {
+      await db.insert(users).values({
+        email: adminEmail,
+        username: "Admin",
+        password: hashedPassword,
+        isAdmin: "true",
+      });
+      console.log("\n========================================");
+      console.log("ADMIN USER CREATED");
+      console.log(`Email: ${adminEmail}`);
+      console.log("========================================\n");
+    } else {
+      console.log("Admin user already exists, skipping creation");
+    }
+  } else {
+    console.log("Skipping admin user creation (ADMIN_EMAIL and ADMIN_PASSWORD not set)");
+    console.log("To create an admin user, set ADMIN_EMAIL and ADMIN_PASSWORD environment variables");
+  }
 
   // Create categories
   const categoryData = [
