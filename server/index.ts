@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import helmet from "helmet";
+import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -9,6 +10,17 @@ const app = express();
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   crossOriginEmbedderPolicy: false,
+  hidePoweredBy: true,
+  noSniff: true,
+  xssFilter: true,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: {
+    action: 'deny'
+  }
 }));
 
 declare global {
@@ -53,6 +65,29 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+const {
+  generateToken,
+  doubleCsrfProtection,
+} = doubleCsrf({
+  getSecret: () => process.env.SESSION_SECRET || 'khushboo-iram-secret-key-change-in-production',
+  cookieName: "x-csrf-token",
+  cookieOptions: {
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+  },
+  size: 64,
+  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+});
+
+app.get("/api/csrf-token", (req, res) => {
+  const token = generateToken(req, res);
+  res.json({ token });
+});
+
+export { doubleCsrfProtection };
 
 app.use((req, res, next) => {
   const start = Date.now();

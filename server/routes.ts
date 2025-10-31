@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import validator from 'validator';
 import { storage } from "./storage";
+import { doubleCsrfProtection } from "./index";
 import { 
   insertProductSchema, 
   insertCategorySchema, 
@@ -66,12 +67,15 @@ async function requireAuth(req: any, res: any, next: any) {
 
 async function requireAdmin(req: any, res: any, next: any) {
   if (!req.session.userId) {
+    console.warn(`[SECURITY] Unauthorized admin access attempt from IP: ${req.ip}`);
     return res.status(401).json({ error: "Authentication required" });
   }
   const user = await storage.getUser(req.session.userId);
   if (!user || user.isAdmin !== 'true') {
+    console.warn(`[SECURITY] Non-admin user ${user?.email || 'unknown'} attempted admin access from IP: ${req.ip}`);
     return res.status(403).json({ error: "Admin access required" });
   }
+  console.log(`[ADMIN] User ${user.email} accessed admin route: ${req.method} ${req.path}`);
   next();
 }
 
@@ -227,12 +231,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.setPasswordResetToken(validated.email.toLowerCase().trim(), resetToken, expiry);
 
-      console.log(`\n========================================`);
-      console.log(`PASSWORD RESET REQUESTED`);
-      console.log(`Email: ${validated.email}`);
-      console.log(`Reset URL: ${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/reset-password?token=${resetToken}`);
-      console.log(`Token expires in 1 hour`);
-      console.log(`========================================\n`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`\n========================================`);
+        console.log(`PASSWORD RESET REQUESTED (DEVELOPMENT ONLY)`);
+        console.log(`Email: ${validated.email}`);
+        console.log(`Reset URL: ${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/reset-password?token=${resetToken}`);
+        console.log(`Token expires in 1 hour`);
+        console.log(`========================================\n`);
+      } else {
+        console.log(`Password reset requested for email (token sent securely)`);
+      }
 
       res.json({ message: "If that email exists, a reset link has been sent" });
     } catch (error) {
@@ -365,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", requireAdmin, async (req, res) => {
+  app.post("/api/products", doubleCsrfProtection, requireAdmin, async (req, res) => {
     try {
       const validated = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validated);
@@ -376,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/products/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/products/:id", doubleCsrfProtection, requireAdmin, async (req, res) => {
     try {
       const existingProduct = await storage.getProductById(req.params.id);
       if (!existingProduct) {
@@ -393,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/products/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/products/:id", doubleCsrfProtection, requireAdmin, async (req, res) => {
     try {
       await storage.deleteProduct(req.params.id);
       res.json({ success: true, message: "Product deleted successfully" });
@@ -593,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/admin/orders/:id/status", requireAdmin, async (req, res) => {
+  app.patch("/api/admin/orders/:id/status", doubleCsrfProtection, requireAdmin, async (req, res) => {
     try {
       const { status } = req.body;
       if (!status) {
