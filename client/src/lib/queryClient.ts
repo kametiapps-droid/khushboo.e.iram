@@ -7,7 +7,15 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+let cachedCsrfToken: string | null = null;
+let csrfTokenExpiry: number = 0;
+
 async function getCsrfToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedCsrfToken && csrfTokenExpiry > now) {
+    return cachedCsrfToken;
+  }
+
   const res = await fetch("/api/csrf-token", {
     credentials: "include",
   });
@@ -15,6 +23,8 @@ async function getCsrfToken(): Promise<string> {
     throw new Error("Failed to get CSRF token");
   }
   const { token } = await res.json();
+  cachedCsrfToken = token;
+  csrfTokenExpiry = now + 3600000;
   return token;
 }
 
@@ -67,7 +77,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5 * 60 * 1000,
       retry: false,
     },
     mutations: {
