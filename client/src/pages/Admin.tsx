@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,12 +28,70 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Package } from "lucide-react";
+import { Trash2, Plus, Package, AlertCircle } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+interface User {
+  id: string;
+  email: string;
+  username: string;
+  isAdmin: boolean;
+}
 
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+
+  const { data: userData, isLoading: userLoading } = useQuery<{ user: User }>({
+    queryKey: ['user'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/me');
+      if (!response.ok) {
+        if (response.status === 401) {
+          navigate('/auth');
+        }
+        throw new Error('Failed to fetch user data');
+      }
+      return response.json();
+    },
+  });
+
+  useEffect(() => {
+    if (userData && !userData.user.isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "You need admin privileges to access this page",
+        variant: "destructive",
+      });
+      navigate('/');
+    }
+  }, [userData, navigate, toast]);
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userData || !userData.user.isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>
+            You need admin privileges to access this page. Redirecting...
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
   const [formData, setFormData] = useState({
     name: "",
     brand: "",
