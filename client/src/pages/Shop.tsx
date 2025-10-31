@@ -175,7 +175,7 @@ export default function Shop() {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6">
             {productsLoading ? (
               <p className="text-center py-12 col-span-2" data-testid="text-loading">Loading products...</p>
             ) : (
