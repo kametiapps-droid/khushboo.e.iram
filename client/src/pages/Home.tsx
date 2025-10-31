@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { ProductCard } from "@/components/ProductCard";
@@ -10,6 +11,28 @@ import { MobileMenu } from "@/components/MobileMenu";
 import { Footer } from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Truck, CreditCard, Award } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  description: string;
+  price: string;
+  image: string;
+  categoryId: string | null;
+  rating: number;
+  stock: number;
+}
+
+interface CartItemWithProduct {
+  id: string;
+  sessionId: string | null;
+  userId: string | null;
+  productId: string;
+  quantity: number;
+  product: Product;
+}
 
 interface CartItem {
   id: string;
@@ -24,69 +47,78 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { toast } = useToast();
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    queryFn: async () => {
-      const response = await fetch("/api/products");
-      if (!response.ok) throw new Error("Failed to fetch products");
-      return response.json();
-    },
   });
 
   const { data: categories = [] } = useQuery({
     queryKey: ["/api/categories"],
-    queryFn: async () => {
-      const response = await fetch("/api/categories");
-      if (!response.ok) throw new Error("Failed to fetch categories");
-      return response.json();
+  });
+
+  const { data: cartData = [] } = useQuery<CartItemWithProduct[]>({
+    queryKey: ['/api/cart'],
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      return apiRequest('POST', '/api/cart', { productId, quantity: 1 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      setCartOpen(true);
+      toast({
+        title: "Added to cart",
+        description: "Product has been added to your cart",
+      });
+    },
+  });
+
+  const updateCartMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      return apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const removeFromCartMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
     },
   });
 
   const featuredProducts = products.slice(0, 8);
 
   const handleAddToCart = (productId: string) => {
-    const product = products.find((p: any) => p.id === productId);
-    if (!product) return;
-
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.id === productId);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
-          brand: product.brand,
-          price: parseFloat(product.price),
-          quantity: 1,
-          image: product.image,
-        },
-      ];
-    });
-    setCartOpen(true);
+    addToCartMutation.mutate(productId);
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+      removeFromCartMutation.mutate(id);
     } else {
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      );
+      updateCartMutation.mutate({ id, quantity });
     }
   };
 
   const handleRemove = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    removeFromCartMutation.mutate(id);
   };
+
+  const cartItems: CartItem[] = cartData.map(item => ({
+    id: item.id,
+    name: item.product.name,
+    brand: item.product.brand,
+    price: parseFloat(item.product.price),
+    quantity: item.quantity,
+    image: item.product.image,
+  }));
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 

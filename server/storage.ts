@@ -191,20 +191,34 @@ export class DbStorage implements IStorage {
   }
 
   async addToCart(item: InsertCartItem): Promise<CartItem> {
-    const existing = await db
-      .select()
-      .from(cartItems)
-      .where(
-        and(
-          eq(cartItems.sessionId, item.sessionId),
-          eq(cartItems.productId, item.productId)
-        )
-      );
+    let existing: CartItem[] = [];
+    
+    if (item.userId) {
+      existing = await db
+        .select()
+        .from(cartItems)
+        .where(
+          and(
+            eq(cartItems.userId, item.userId),
+            eq(cartItems.productId, item.productId)
+          )
+        );
+    } else if (item.sessionId) {
+      existing = await db
+        .select()
+        .from(cartItems)
+        .where(
+          and(
+            eq(cartItems.sessionId, item.sessionId),
+            eq(cartItems.productId, item.productId)
+          )
+        );
+    }
 
     if (existing.length > 0) {
       const updated = await db
         .update(cartItems)
-        .set({ quantity: existing[0].quantity + item.quantity })
+        .set({ quantity: existing[0].quantity + (item.quantity || 1) })
         .where(eq(cartItems.id, existing[0].id))
         .returning();
       return updated[0];
