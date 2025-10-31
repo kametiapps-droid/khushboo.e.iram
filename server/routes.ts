@@ -4,6 +4,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
+import validator from 'validator';
 import { storage } from "./storage";
 import { 
   insertProductSchema, 
@@ -39,6 +41,22 @@ const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(
   GOOGLE_REDIRECT_URI
 ) : null;
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many authentication attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 async function requireAuth(req: any, res: any, next: any) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
@@ -59,58 +77,97 @@ async function requireAdmin(req: any, res: any, next: any) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
-  app.post("/api/auth/signup", async (req, res) => {
+  app.post("/api/auth/signup", authLimiter, async (req, res) => {
     try {
       const validated = signupSchema.parse(req.body);
+      
+      if (!validator.isEmail(validated.email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
       
       const existingUser = await storage.getUserByEmail(validated.email);
       if (existingUser) {
         return res.status(400).json({ error: "Email already registered" });
       }
 
-      const hashedPassword = await bcrypt.hash(validated.password, 10);
+      const hashedPassword = await bcrypt.hash(validated.password, 12);
       const user = await storage.createUser({
-        email: validated.email,
-        username: validated.username,
+        email: validated.email.toLowerCase().trim(),
+        username: validated.username.trim(),
         password: hashedPassword,
       });
 
       req.session.userId = user.id;
+      await storage.updateLastLogin(user.id);
+      
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
       res.json({ 
         user: { id: user.id, email: user.email, username: user.username },
         token 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error signing up:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       res.status(400).json({ error: "Failed to create account" });
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authLimiter, async (req, res) => {
     try {
       const validated = loginSchema.parse(req.body);
       
-      const user = await storage.getUserByEmail(validated.email);
+      const user = await storage.getUserByEmail(validated.email.toLowerCase().trim());
       if (!user || !user.password) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
-      const validPassword = await bcrypt.compare(validated.password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: "Invalid email or password" });
+      if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
+        const minutesLeft = Math.ceil((user.accountLockedUntil.getTime() - Date.now()) / (60 * 1000));
+        return res.status(423).json({ 
+          error: `Account temporarily locked due to multiple failed login attempts. Please try again in ${minutesLeft} minute(s).` 
+        });
       }
 
+      const validPassword = await bcrypt.compare(validated.password, user.password);
+      if (!validPassword) {
+        await storage.incrementFailedLoginAttempts(user.id);
+        const updatedUser = await storage.getUser(user.id);
+        const remainingAttempts = 5 - (updatedUser?.failedLoginAttempts || 0);
+        
+        if (remainingAttempts > 0) {
+          return res.status(401).json({ 
+            error: `Invalid email or password. ${remainingAttempts} attempt(s) remaining before account lockout.` 
+          });
+        } else {
+          return res.status(423).json({ 
+            error: "Account locked due to multiple failed login attempts. Please try again in 15 minutes." 
+          });
+        }
+      }
+
+      await storage.resetFailedLoginAttempts(user.id);
+      await storage.updateLastLogin(user.id);
+      
       req.session.userId = user.id;
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
       res.json({ 
-        user: { id: user.id, email: user.email, username: user.username },
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          username: user.username,
+          isAdmin: user.isAdmin === 'true'
+        },
         token 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error logging in:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       res.status(400).json({ error: "Failed to log in" });
     }
   });
@@ -150,11 +207,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", authLimiter, async (req, res) => {
     try {
       const validated = forgotPasswordSchema.parse(req.body);
       
-      const user = await storage.getUserByEmail(validated.email);
+      if (!validator.isEmail(validated.email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      const user = await storage.getUserByEmail(validated.email.toLowerCase().trim());
       if (!user) {
         return res.json({ message: "If that email exists, a reset link has been sent" });
       }
@@ -162,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resetToken = crypto.randomBytes(32).toString('hex');
       const expiry = new Date(Date.now() + 3600000);
       
-      await storage.setPasswordResetToken(validated.email, resetToken, expiry);
+      await storage.setPasswordResetToken(validated.email.toLowerCase().trim(), resetToken, expiry);
 
       console.log(`\n========================================`);
       console.log(`PASSWORD RESET REQUESTED`);
@@ -178,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
     try {
       const validated = resetPasswordSchema.parse(req.body);
       
@@ -187,13 +248,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid or expired reset token" });
       }
 
-      const hashedPassword = await bcrypt.hash(validated.password, 10);
+      const hashedPassword = await bcrypt.hash(validated.password, 12);
       await storage.updateUser(user.id, { password: hashedPassword });
       await storage.clearResetToken(user.id);
+      await storage.resetFailedLoginAttempts(user.id);
 
       res.json({ message: "Password reset successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error resetting password:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       res.status(400).json({ error: "Failed to reset password" });
     }
   });
@@ -595,15 +660,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contact", async (req, res) => {
+  app.post("/api/contact", generalLimiter, async (req, res) => {
     try {
       const { name, email, subject, message } = req.body;
       
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+      
+      if (!validator.isEmail(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      const sanitizedName = validator.escape(name.trim());
+      const sanitizedSubject = validator.escape(subject.trim());
+      const sanitizedMessage = validator.escape(message.trim());
+      
       console.log("Contact form submission:", {
-        name,
-        email,
-        subject,
-        message,
+        name: sanitizedName,
+        email: email.toLowerCase().trim(),
+        subject: sanitizedSubject,
+        message: sanitizedMessage,
         timestamp: new Date().toISOString(),
       });
 
