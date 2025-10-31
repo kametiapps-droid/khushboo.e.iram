@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import ScrollToTop from "@/components/ScrollToTop";
 import Home from "@/pages/Home";
 import Shop from "@/pages/Shop";
+import Categories from "@/pages/Categories";
 import CategoryDetail from "@/pages/CategoryDetail";
 import Contact from "@/pages/Contact";
 import About from "@/pages/About";
@@ -27,6 +28,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/shop" component={Shop} />
+        <Route path="/categories" component={Categories} />
         <Route path="/categories/:slug" component={CategoryDetail} />
         <Route path="/contact" component={Contact} />
         <Route path="/about" component={About} />
