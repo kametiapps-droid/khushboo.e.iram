@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
-import { Hero } from "@/components/Hero";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryCard } from "@/components/CategoryCard";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -133,12 +132,13 @@ export default function Home() {
       <MobileMenu isOpen={mobileMenuOpen} onOpenChange={setMobileMenuOpen} />
 
       <main className="flex-1">
-        <Hero />
-
-        {/* Featured Products Only */}
+        {/* Products Section */}
         <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 md:gap-8">
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light mb-8 sm:mb-12 text-center" data-testid="text-products-title">
+              Our Products
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 md:gap-10 lg:gap-12">
               {featuredProducts.map((product: any) => (
                 <ProductCard
                   key={product.id}
