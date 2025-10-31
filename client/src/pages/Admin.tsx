@@ -257,6 +257,7 @@ function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders/monthly-report"] });
       toast({
         title: "Success!",
         description: "Order status updated successfully",
