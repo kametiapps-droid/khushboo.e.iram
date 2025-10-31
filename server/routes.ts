@@ -496,6 +496,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/orders", requireAdmin, async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching all orders:", error);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/admin/orders/stats", requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getOrderStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching order stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.get("/api/admin/orders/status/:status", requireAdmin, async (req, res) => {
+    try {
+      const orders = await storage.getOrdersByStatus(req.params.status);
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching orders by status:", error);
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/status", requireAdmin, async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ error: "Status is required" });
+      }
+      
+      const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      await storage.updateOrderStatus(req.params.id, status);
+      const updatedOrder = await storage.getOrderById(req.params.id);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      res.status(500).json({ error: "Failed to update order status" });
+    }
+  });
+
+  app.get("/api/admin/orders/monthly-report", requireAdmin, async (req, res) => {
+    try {
+      const { year, month } = req.query;
+      
+      const currentDate = new Date();
+      const targetYear = year ? parseInt(year as string) : currentDate.getFullYear();
+      const targetMonth = month ? parseInt(month as string) - 1 : currentDate.getMonth();
+      
+      const startDate = new Date(targetYear, targetMonth, 1);
+      const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+      
+      const orders = await storage.getOrdersByDateRange(startDate, endDate);
+      
+      const report = {
+        month: targetMonth + 1,
+        year: targetYear,
+        totalOrders: orders.length,
+        totalRevenue: orders
+          .filter(o => o.status !== 'cancelled')
+          .reduce((sum, o) => sum + parseFloat(o.total), 0)
+          .toFixed(2),
+        ordersByStatus: {
+          pending: orders.filter(o => o.status === 'pending').length,
+          processing: orders.filter(o => o.status === 'processing').length,
+          shipped: orders.filter(o => o.status === 'shipped').length,
+          delivered: orders.filter(o => o.status === 'delivered').length,
+          cancelled: orders.filter(o => o.status === 'cancelled').length,
+        },
+        orders: orders,
+      };
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating monthly report:", error);
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
+  app.get("/api/admin/orders/:id/items", requireAdmin, async (req, res) => {
+    try {
+      const items = await storage.getOrderItemsByOrderId(req.params.id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching order items:", error);
+      res.status(500).json({ error: "Failed to fetch order items" });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     try {
       const { name, email, subject, message } = req.body;

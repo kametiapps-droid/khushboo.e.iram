@@ -58,6 +58,18 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<Order[]>;
   getOrderItemsByOrderId(orderId: string): Promise<(OrderItem & { product: Product })[]>;
   updateOrderStatus(id: string, status: string, stripePaymentId?: string): Promise<void>;
+  getAllOrders(): Promise<Order[]>;
+  getOrdersByStatus(status: string): Promise<Order[]>;
+  getOrdersByDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
+  getOrderStats(): Promise<{
+    total: number;
+    pending: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+    totalRevenue: string;
+  }>;
 }
 
 export class DbStorage implements IStorage {
@@ -281,6 +293,50 @@ export class DbStorage implements IStorage {
       .update(orders)
       .set({ status, ...(stripePaymentId && { stripePaymentId }) })
       .where(eq(orders.id, id));
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+    const result = await db.select().from(orders).orderBy(orders.createdAt);
+    return result.reverse();
+  }
+
+  async getOrdersByStatus(status: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.status, status)).orderBy(orders.createdAt);
+  }
+
+  async getOrdersByDateRange(startDate: Date, endDate: Date): Promise<Order[]> {
+    const result = await db.select().from(orders);
+    return result.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= startDate && orderDate <= endDate;
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getOrderStats(): Promise<{
+    total: number;
+    pending: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+    totalRevenue: string;
+  }> {
+    const allOrders = await db.select().from(orders);
+    
+    const stats = {
+      total: allOrders.length,
+      pending: allOrders.filter(o => o.status === 'pending').length,
+      processing: allOrders.filter(o => o.status === 'processing').length,
+      shipped: allOrders.filter(o => o.status === 'shipped').length,
+      delivered: allOrders.filter(o => o.status === 'delivered').length,
+      cancelled: allOrders.filter(o => o.status === 'cancelled').length,
+      totalRevenue: allOrders
+        .filter(o => o.status !== 'cancelled')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0)
+        .toFixed(2),
+    };
+    
+    return stats;
   }
 }
 
