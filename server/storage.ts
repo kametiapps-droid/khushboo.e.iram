@@ -62,6 +62,12 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<Order[]>;
   getOrderItemsByOrderId(orderId: string): Promise<(OrderItem & { product: Product })[]>;
   updateOrderStatus(id: string, status: string, stripePaymentId?: string): Promise<void>;
+  updateOrderDeliveryStatus(id: string, data: {
+    deliveryStatus?: string;
+    trackingNumber?: string;
+    estimatedDeliveryDate?: Date;
+    deliveryNotes?: string;
+  }): Promise<Order>;
   getAllOrders(): Promise<Order[]>;
   getOrdersByStatus(status: string): Promise<Order[]>;
   getOrdersByDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
@@ -322,6 +328,23 @@ export class DbStorage implements IStorage {
       .update(orders)
       .set({ status, ...(stripePaymentId && { stripePaymentId }) })
       .where(eq(orders.id, id));
+  }
+
+  async updateOrderDeliveryStatus(id: string, data: {
+    deliveryStatus?: string;
+    trackingNumber?: string;
+    estimatedDeliveryDate?: Date;
+    deliveryNotes?: string;
+  }): Promise<Order> {
+    const result = await db
+      .update(orders)
+      .set({ 
+        ...data, 
+        updatedAt: new Date() 
+      })
+      .where(eq(orders.id, id))
+      .returning();
+    return result[0];
   }
 
   async getAllOrders(): Promise<Order[]> {

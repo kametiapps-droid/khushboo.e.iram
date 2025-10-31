@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -11,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { 
   User, 
   ShoppingBag, 
@@ -21,8 +23,12 @@ import {
   Calendar,
   Trash2,
   Plus,
-  Minus
+  Minus,
+  Truck,
+  CheckCircle,
+  Clock
 } from "lucide-react";
+import { format } from "date-fns";
 
 interface User {
   id: string;
@@ -63,7 +69,12 @@ interface Order {
   country: string;
   total: string;
   status: string;
+  deliveryStatus: string;
+  trackingNumber: string | null;
+  estimatedDeliveryDate: string | null;
+  deliveryNotes: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export default function Dashboard() {
@@ -86,6 +97,14 @@ export default function Dashboard() {
       return data.user as User;
     },
   });
+
+  const { lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (lastMessage?.type === 'order_update' && userData?.id) {
+      queryClient.invalidateQueries({ queryKey: ['orders', userData.id] });
+    }
+  }, [lastMessage, userData?.id, queryClient]);
 
   const { data: cartItems = [], isLoading: cartLoading } = useQuery({
     queryKey: ['cart', userData?.id],
@@ -195,6 +214,42 @@ export default function Dashboard() {
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getDeliveryStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'processing':
+        return 'bg-purple-100 text-purple-800';
+      case 'out_for_delivery':
+        return 'bg-orange-100 text-orange-800';
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+      default:
+        return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  const getDeliveryStatusText = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+        return 'Confirmed';
+      case 'processing':
+        return 'Processing';
+      case 'out_for_delivery':
+        return 'Out for Delivery';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'pending':
+      default:
+        return 'Pending';
     }
   };
 
@@ -428,10 +483,10 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-4">
                       {orders.map((order) => (
-                        <div key={order.id} className="border rounded-lg p-4">
+                        <div key={order.id} className="border rounded-lg p-6 bg-card" data-testid={`order-${order.id}`}>
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                             <div>
-                              <h4 className="font-semibold">Order #{order.id.slice(0, 8)}</h4>
+                              <h4 className="font-semibold text-lg">Order #{order.id.slice(0, 8)}</h4>
                               <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                                 <Calendar className="h-4 w-4" />
                                 {new Date(order.createdAt).toLocaleDateString('en-US', {
@@ -445,14 +500,106 @@ export default function Dashboard() {
                               <Badge className={getStatusColor(order.status)}>
                                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                               </Badge>
-                              <p className="font-bold">PKR {parseFloat(order.total).toLocaleString()}</p>
+                              <p className="font-bold text-lg">PKR {parseFloat(order.total).toLocaleString()}</p>
                             </div>
                           </div>
-                          <Separator className="my-3" />
-                          <div className="text-sm">
-                            <p><strong>Name:</strong> {order.name}</p>
-                            <p><strong>Email:</strong> {order.email}</p>
-                            <p><strong>Address:</strong> {order.address}, {order.city} {order.postalCode}, {order.country}</p>
+
+                          <Separator className="my-4" />
+
+                          <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              <div className="flex-1">
+                                <h5 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                  <Truck className="h-4 w-4" />
+                                  Delivery Status
+                                </h5>
+                                <Badge className={getDeliveryStatusColor(order.deliveryStatus)} data-testid={`delivery-status-${order.id}`}>
+                                  {getDeliveryStatusText(order.deliveryStatus)}
+                                </Badge>
+                                
+                                {order.trackingNumber && (
+                                  <div className="mt-3">
+                                    <p className="text-xs text-muted-foreground">Tracking Number</p>
+                                    <p className="font-mono text-sm font-semibold" data-testid={`tracking-number-${order.id}`}>
+                                      {order.trackingNumber}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {order.estimatedDeliveryDate && (
+                                  <div className="mt-3">
+                                    <p className="text-xs text-muted-foreground">Estimated Delivery</p>
+                                    <p className="text-sm font-medium flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {format(new Date(order.estimatedDeliveryDate), 'MMM dd, yyyy')}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {order.deliveryNotes && (
+                                  <div className="mt-3">
+                                    <p className="text-xs text-muted-foreground">Delivery Notes</p>
+                                    <p className="text-sm" data-testid={`delivery-notes-${order.id}`}>
+                                      {order.deliveryNotes}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <Separator orientation="vertical" className="hidden sm:block" />
+
+                              <div className="flex-1">
+                                <h5 className="text-sm font-semibold mb-2">Order Progress</h5>
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`flex items-center justify-center h-8 w-8 rounded-full ${['confirmed', 'processing', 'out_for_delivery', 'delivered'].includes(order.deliveryStatus) ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                      <CheckCircle className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">Order Confirmed</p>
+                                      <p className="text-xs text-muted-foreground">We've received your order</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    <div className={`flex items-center justify-center h-8 w-8 rounded-full ${['processing', 'out_for_delivery', 'delivered'].includes(order.deliveryStatus) ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                      <Package className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">Processing</p>
+                                      <p className="text-xs text-muted-foreground">Your order is being prepared</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    <div className={`flex items-center justify-center h-8 w-8 rounded-full ${['out_for_delivery', 'delivered'].includes(order.deliveryStatus) ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                      <Truck className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">Out for Delivery</p>
+                                      <p className="text-xs text-muted-foreground">Package is on its way</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    <div className={`flex items-center justify-center h-8 w-8 rounded-full ${order.deliveryStatus === 'delivered' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                      <CheckCircle className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">Delivered</p>
+                                      <p className="text-xs text-muted-foreground">Order completed</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <Separator />
+
+                            <div className="text-sm space-y-1">
+                              <p><strong>Shipping To:</strong> {order.name}</p>
+                              <p className="text-muted-foreground">{order.address}, {order.city} {order.postalCode}, {order.country}</p>
+                            </div>
                           </div>
                         </div>
                       ))}

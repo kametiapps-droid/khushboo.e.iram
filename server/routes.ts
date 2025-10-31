@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import validator from 'validator';
 import { storage } from "./storage";
 import { doubleCsrfProtection } from "./index";
+import { orderUpdateService } from "./websocket";
 import { 
   insertProductSchema, 
   insertCategorySchema, 
@@ -17,7 +18,8 @@ import {
   loginSchema,
   signupSchema,
   forgotPasswordSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
+  updateOrderStatusSchema
 } from "@shared/schema";
 
 if (process.env.NODE_ENV === 'production') {
@@ -627,6 +629,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating order status:", error);
       res.status(500).json({ error: "Failed to update order status" });
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/delivery", doubleCsrfProtection, requireAdmin, async (req, res) => {
+    try {
+      const parsed = updateOrderStatusSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      const updateData: any = {
+        deliveryStatus: parsed.data.deliveryStatus,
+        trackingNumber: parsed.data.trackingNumber,
+        deliveryNotes: parsed.data.deliveryNotes,
+      };
+
+      if (parsed.data.estimatedDeliveryDate) {
+        updateData.estimatedDeliveryDate = new Date(parsed.data.estimatedDeliveryDate);
+      }
+
+      const updatedOrder = await storage.updateOrderDeliveryStatus(req.params.id, updateData);
+      
+      if (orderUpdateService) {
+        orderUpdateService.notifyOrderUpdate(req.params.id);
+      }
+
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error("Error updating delivery status:", error);
+      res.status(500).json({ error: "Failed to update delivery status" });
     }
   });
 

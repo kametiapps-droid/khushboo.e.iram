@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Trash2, 
@@ -82,8 +84,14 @@ interface Order {
   country: string;
   total: string;
   status: string;
+  deliveryStatus: string;
+  trackingNumber: string | null;
+  estimatedDeliveryDate: string | null;
+  deliveryNotes: string | null;
+  phone: string | null;
   stripePaymentId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface OrderItem {
@@ -187,6 +195,13 @@ function AdminDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  
+  const [deliveryFormData, setDeliveryFormData] = useState({
+    deliveryStatus: "",
+    trackingNumber: "",
+    estimatedDeliveryDate: "",
+    deliveryNotes: "",
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -198,6 +213,19 @@ function AdminDashboard() {
     rating: "5",
     stock: "",
   });
+
+  const { lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (lastMessage?.type === 'order_update' || lastMessage?.type === 'new_order') {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders/stats"] });
+      toast({
+        title: lastMessage.type === 'new_order' ? "New Order" : "Order Updated",
+        description: `Order ${lastMessage.orderId?.substring(0, 8)}... has been ${lastMessage.type === 'new_order' ? 'placed' : 'updated'}`,
+      });
+    }
+  }, [lastMessage, queryClient, toast]);
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -264,6 +292,33 @@ function AdminDashboard() {
       toast({
         title: "Error",
         description: "Failed to update order status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateDeliveryStatusMutation = useMutation({
+    mutationFn: async ({ orderId, data }: { orderId: string; data: any }) => {
+      return await apiRequest("PATCH", `/api/admin/orders/${orderId}/delivery`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders/stats"] });
+      toast({
+        title: "Success!",
+        description: "Delivery status updated successfully",
+      });
+      setDeliveryFormData({
+        deliveryStatus: "",
+        trackingNumber: "",
+        estimatedDeliveryDate: "",
+        deliveryNotes: "",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update delivery status",
         variant: "destructive",
       });
     },
@@ -624,6 +679,99 @@ function AdminDashboard() {
                                           <SelectItem value="cancelled">Cancelled</SelectItem>
                                         </SelectContent>
                                       </Select>
+                                    </div>
+
+                                    <Separator className="my-4" />
+
+                                    <div className="space-y-4">
+                                      <h3 className="text-lg font-semibold">Delivery Tracking</h3>
+                                      
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <Label>Current Status</Label>
+                                          <Badge className="mt-2">
+                                            {order.deliveryStatus || 'pending'}
+                                          </Badge>
+                                        </div>
+                                        {order.trackingNumber && (
+                                          <div>
+                                            <Label>Tracking Number</Label>
+                                            <p className="text-sm font-mono mt-2">{order.trackingNumber}</p>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="deliveryStatus">Update Delivery Status</Label>
+                                        <Select
+                                          value={deliveryFormData.deliveryStatus || order.deliveryStatus}
+                                          onValueChange={(value) => setDeliveryFormData({...deliveryFormData, deliveryStatus: value})}
+                                        >
+                                          <SelectTrigger className="mt-2" id="deliveryStatus" data-testid={`select-delivery-status-${order.id}`}>
+                                            <SelectValue placeholder="Select status" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                                            <SelectItem value="processing">Processing</SelectItem>
+                                            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                            <SelectItem value="delivered">Delivered</SelectItem>
+                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="trackingNumber">Tracking Number</Label>
+                                        <Input
+                                          id="trackingNumber"
+                                          placeholder="Enter tracking number"
+                                          value={deliveryFormData.trackingNumber}
+                                          onChange={(e) => setDeliveryFormData({...deliveryFormData, trackingNumber: e.target.value})}
+                                          className="mt-2"
+                                          data-testid={`input-tracking-${order.id}`}
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="estimatedDeliveryDate">Estimated Delivery Date</Label>
+                                        <Input
+                                          id="estimatedDeliveryDate"
+                                          type="date"
+                                          value={deliveryFormData.estimatedDeliveryDate}
+                                          onChange={(e) => setDeliveryFormData({...deliveryFormData, estimatedDeliveryDate: e.target.value})}
+                                          className="mt-2"
+                                          data-testid={`input-delivery-date-${order.id}`}
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="deliveryNotes">Delivery Notes</Label>
+                                        <Textarea
+                                          id="deliveryNotes"
+                                          placeholder="Add any delivery notes or special instructions"
+                                          value={deliveryFormData.deliveryNotes}
+                                          onChange={(e) => setDeliveryFormData({...deliveryFormData, deliveryNotes: e.target.value})}
+                                          className="mt-2"
+                                          rows={3}
+                                          data-testid={`textarea-delivery-notes-${order.id}`}
+                                        />
+                                      </div>
+
+                                      <Button
+                                        onClick={() => {
+                                          updateDeliveryStatusMutation.mutate({
+                                            orderId: order.id,
+                                            data: deliveryFormData,
+                                          });
+                                        }}
+                                        className="w-full"
+                                        disabled={!deliveryFormData.deliveryStatus}
+                                        data-testid={`button-update-delivery-${order.id}`}
+                                      >
+                                        <Truck className="h-4 w-4 mr-2" />
+                                        Update Delivery Status
+                                      </Button>
                                     </div>
                                   </div>
                                 </DialogContent>

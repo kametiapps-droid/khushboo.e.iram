@@ -124,13 +124,27 @@ export const orders = pgTable("orders", {
   country: text("country").notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"),
+  deliveryStatus: text("delivery_status").notNull().default("pending"),
+  trackingNumber: text("tracking_number"),
+  estimatedDeliveryDate: timestamp("estimated_delivery_date"),
+  deliveryNotes: text("delivery_notes"),
+  phone: text("phone"),
   stripePaymentId: text("stripe_payment_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const updateOrderStatusSchema = z.object({
+  deliveryStatus: z.enum(["pending", "confirmed", "processing", "out_for_delivery", "delivered", "cancelled"]),
+  trackingNumber: z.string().optional(),
+  estimatedDeliveryDate: z.string().optional(),
+  deliveryNotes: z.string().optional(),
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
