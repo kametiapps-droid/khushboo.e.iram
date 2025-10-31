@@ -76,6 +76,8 @@ async function requireAdmin(req: any, res: any, next: any) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use('/api', generalLimiter);
+  
   // Authentication routes
   app.post("/api/auth/signup", authLimiter, async (req, res) => {
     try {
