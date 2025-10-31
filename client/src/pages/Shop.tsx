@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
@@ -43,6 +44,7 @@ interface CartItem {
 }
 
 export default function Shop() {
+  const [, setLocation] = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -189,7 +191,7 @@ export default function Shop() {
                   image={product.image}
                   rating={product.rating}
                   onAddToCart={handleAddToCart}
-                  onClick={(id) => console.log("Product clicked:", id)}
+                  onClick={(id) => setLocation(`/product/${id}`)}
                   isAdding={addingProductId === product.id}
                   isAdded={addedProductId === product.id}
                 />

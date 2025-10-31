@@ -154,7 +154,7 @@ export default function Home() {
                   price={parseFloat(product.price)}
                   image={product.image}
                   onAddToCart={handleAddToCart}
-                  onClick={() => setLocation("/shop")}
+                  onClick={(id) => setLocation(`/product/${id}`)}
                   isAdding={addingProductId === product.id}
                   isAdded={addedProductId === product.id}
                   hideRating={true}
