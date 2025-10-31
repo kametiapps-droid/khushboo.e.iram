@@ -28,6 +28,30 @@ async function seed() {
       image: "/attached_assets/generated_images/Body_spray_collection_image_78ba13da.png",
       productCount: 3,
     },
+    {
+      name: "Gift Sets",
+      description: "Beautifully curated fragrance gift sets perfect for special occasions",
+      image: "/attached_assets/generated_images/Scent_collection_category_image_863be1ae.png",
+      productCount: 3,
+    },
+    {
+      name: "Unisex Fragrances",
+      description: "Modern scents designed for everyone, breaking traditional boundaries",
+      image: "/attached_assets/generated_images/Product_card_perfume_2_7581cb26.png",
+      productCount: 3,
+    },
+    {
+      name: "Incense & Bakhoor",
+      description: "Traditional Arabian incense and bakhoor for home fragrance",
+      image: "/attached_assets/generated_images/Attar_collection_category_image_262b83c4.png",
+      productCount: 3,
+    },
+    {
+      name: "Fragrance Oils",
+      description: "Pure concentrated fragrance oils for long-lasting scent",
+      image: "/attached_assets/generated_images/Product_card_attar_bottle_2b233b12.png",
+      productCount: 2,
+    },
   ];
 
   await db.insert(categories).values(categoryData);
@@ -38,8 +62,12 @@ async function seed() {
   const perfumeCategory = createdCategories.find(c => c.name === "Premium Perfumes");
   const attarCategory = createdCategories.find(c => c.name === "Traditional Attar");
   const sprayCategory = createdCategories.find(c => c.name === "Body Sprays");
+  const giftSetCategory = createdCategories.find(c => c.name === "Gift Sets");
+  const unisexCategory = createdCategories.find(c => c.name === "Unisex Fragrances");
+  const incenseCategory = createdCategories.find(c => c.name === "Incense & Bakhoor");
+  const oilCategory = createdCategories.find(c => c.name === "Fragrance Oils");
 
-  if (!perfumeCategory || !attarCategory || !sprayCategory) {
+  if (!perfumeCategory || !attarCategory || !sprayCategory || !giftSetCategory || !unisexCategory || !incenseCategory || !oilCategory) {
     throw new Error("Failed to create categories");
   }
 
@@ -147,6 +175,120 @@ async function seed() {
       categoryId: sprayCategory.id,
       rating: 5,
       stock: 80,
+    },
+    // Gift Sets
+    {
+      name: "Luxury Collection Gift Set",
+      brand: "Premium Collection",
+      description: "Exclusive gift set featuring our best perfumes in elegant packaging",
+      price: "15000.00",
+      image: "/attached_assets/generated_images/Scent_collection_category_image_863be1ae.png",
+      categoryId: giftSetCategory.id,
+      rating: 5,
+      stock: 20,
+    },
+    {
+      name: "Arabian Nights Gift Set",
+      brand: "Traditional Scents",
+      description: "Collection of premium attar oils and incense in luxury box",
+      price: "12500.00",
+      image: "/attached_assets/generated_images/Attar_collection_category_image_262b83c4.png",
+      categoryId: giftSetCategory.id,
+      rating: 5,
+      stock: 15,
+    },
+    {
+      name: "Travel Essentials Set",
+      brand: "Daily Essentials",
+      description: "Perfect travel-sized fragrances for on-the-go freshness",
+      price: "7500.00",
+      image: "/attached_assets/generated_images/Product_sample_perfume_bottle_5df1c02b.png",
+      categoryId: giftSetCategory.id,
+      rating: 4,
+      stock: 30,
+    },
+    // Unisex Fragrances
+    {
+      name: "Eternal Balance",
+      brand: "Modern Scents",
+      description: "Fresh citrus and woody notes perfect for any occasion",
+      price: "9800.00",
+      image: "/attached_assets/generated_images/Product_card_perfume_2_7581cb26.png",
+      categoryId: unisexCategory.id,
+      rating: 5,
+      stock: 45,
+    },
+    {
+      name: "Urban Spirit",
+      brand: "Modern Scents",
+      description: "Contemporary blend of bergamot, cedar, and musk",
+      price: "10500.00",
+      image: "/attached_assets/generated_images/Product_card_perfume_1_d7380d71.png",
+      categoryId: unisexCategory.id,
+      rating: 5,
+      stock: 35,
+    },
+    {
+      name: "Natural Harmony",
+      brand: "Modern Scents",
+      description: "Organic ingredients with earthy and floral undertones",
+      price: "8900.00",
+      image: "/attached_assets/generated_images/Product_sample_perfume_bottle_5df1c02b.png",
+      categoryId: unisexCategory.id,
+      rating: 4,
+      stock: 40,
+    },
+    // Incense & Bakhoor
+    {
+      name: "Royal Bakhoor",
+      brand: "Arabian Heritage",
+      description: "Premium bakhoor chips with oud and amber essence",
+      price: "4500.00",
+      image: "/attached_assets/generated_images/Attar_collection_category_image_262b83c4.png",
+      categoryId: incenseCategory.id,
+      rating: 5,
+      stock: 60,
+    },
+    {
+      name: "Sandalwood Incense Sticks",
+      brand: "Arabian Heritage",
+      description: "Pure sandalwood incense sticks for meditation and relaxation",
+      price: "2500.00",
+      image: "/attached_assets/generated_images/Attar_collection_category_image_262b83c4.png",
+      categoryId: incenseCategory.id,
+      rating: 5,
+      stock: 100,
+    },
+    {
+      name: "Oudh Bakhoor Premium",
+      brand: "Arabian Heritage",
+      description: "Luxury bakhoor with authentic oudh and rose extracts",
+      price: "5500.00",
+      image: "/attached_assets/generated_images/Product_card_attar_bottle_2b233b12.png",
+      categoryId: incenseCategory.id,
+      rating: 5,
+      stock: 50,
+    },
+    // Fragrance Oils
+    {
+      name: "Pure Musk Oil",
+      brand: "Essential Oils",
+      description: "Concentrated musk fragrance oil for long-lasting scent",
+      price: "5800.00",
+      image: "/attached_assets/generated_images/Product_card_attar_bottle_2b233b12.png",
+      categoryId: oilCategory.id,
+      rating: 5,
+      stock: 35,
+    },
+    {
+      name: "Rose Garden Oil",
+      brand: "Essential Oils",
+      description: "Pure rose fragrance oil extracted from premium blooms",
+      price: "6200.00",
+      image: "/attached_assets/generated_images/Product_card_attar_bottle_2b233b12.png",
+      categoryId: oilCategory.id,
+      rating: 5,
+      stock: 30,
     },
   ];
 
