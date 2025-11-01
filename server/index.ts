@@ -8,6 +8,8 @@ import { setupWebSocket } from "./websocket";
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   crossOriginEmbedderPolicy: false,
@@ -68,7 +70,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false }));
 
 const {
-  generateToken: csrfGenerateToken,
+  generateCsrfToken,
   doubleCsrfProtection,
 } = doubleCsrf({
   getSecret: () => process.env.SESSION_SECRET || 'khushboo-iram-secret-key-change-in-production',
@@ -87,7 +89,7 @@ const {
 });
 
 app.get("/api/csrf-token", (req, res) => {
-  const token = csrfGenerateToken(req, res, false);
+  const token = generateCsrfToken(req, res);
   res.json({ token });
 });
 
