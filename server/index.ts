@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -68,6 +69,7 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 const {
   generateCsrfToken,
@@ -89,7 +91,7 @@ const {
 });
 
 app.get("/api/csrf-token", (req, res) => {
-  const token = generateCsrfToken(req, res);
+  const token = generateCsrfToken(req, res, { overwrite: true });
   res.json({ token });
 });
 
